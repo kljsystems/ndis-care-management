@@ -7,6 +7,7 @@ import Invoices from './pages/Invoices'
 import SessionNotes from './pages/SessionNotes'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import ClientDetail from './pages/Clientdetail'
+import AppointmentDetail from './pages/Appointmentdetail'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session } = useAuth()
@@ -24,6 +25,7 @@ function AppRoutes() {
       <Route path="/session-notes" element={<ProtectedRoute><SessionNotes /></ProtectedRoute>} />
       <Route path="/clients/:id" element={<ProtectedRoute><ClientDetail /></ProtectedRoute>} />
       <Route path="/session-notes/:appointmentId" element={<ProtectedRoute><SessionNotes /></ProtectedRoute>} />
+      <Route path="/appointments/:id" element={<ProtectedRoute><AppointmentDetail /></ProtectedRoute>} />
     </Routes>
   )
 }
