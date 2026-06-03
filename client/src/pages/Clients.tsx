@@ -2,13 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-interface Rate {
-  id: string
-  rate_type: string
-  label: string
-  amount_per_hour: number
-}
-
 interface Client {
   id: string
   full_name: string
@@ -19,7 +12,6 @@ interface Client {
   address: string
   emergency_contact_name: string
   emergency_contact_phone: string
-  client_rates?: Rate[]
 }
 
 const API = import.meta.env.VITE_API_URL
@@ -46,7 +38,6 @@ export default function Clients() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [rates, setRates] = useState<{ label: string; rate_type: string; amount_per_hour: string }[]>([
     { label: 'Weekday Daytime', rate_type: 'Weekday Daytime', amount_per_hour: '' }
@@ -71,11 +62,8 @@ export default function Clients() {
     setError('')
     setSuccess('')
 
-    const url = editingClient ? `${API}/clients/${editingClient.id}` : `${API}/clients`
-    const method = editingClient ? 'PUT' : 'POST'
-
-    const res = await fetch(url, {
-      method,
+    const res = await fetch(`${API}/clients`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
     })
@@ -87,7 +75,7 @@ export default function Clients() {
       return
     }
 
-    if (!editingClient && rates.length > 0) {
+    if (rates.length > 0) {
       for (const rate of rates) {
         if (rate.amount_per_hour) {
           await fetch(`${API}/clients/${client.id}/rates`, {
@@ -103,30 +91,12 @@ export default function Clients() {
       }
     }
 
-    setSuccess(editingClient ? 'Client updated successfully' : 'Client created successfully')
+    setSuccess('Client created successfully')
     setShowForm(false)
-    setEditingClient(null)
     setForm(emptyForm)
     setRates([{ label: 'Weekday Daytime', rate_type: 'Weekday Daytime', amount_per_hour: '' }])
     fetchClients()
     setSaving(false)
-  }
-
-  const startEdit = (client: Client) => {
-    setEditingClient(client)
-    setSuccess('')
-    setError('')
-    setForm({
-      full_name: client.full_name || '',
-      ndis_number: client.ndis_number || '',
-      phone: client.phone || '',
-      email: client.email || '',
-      date_of_birth: client.date_of_birth || '',
-      address: client.address || '',
-      emergency_contact_name: client.emergency_contact_name || '',
-      emergency_contact_phone: client.emergency_contact_phone || ''
-    })
-    setShowForm(true)
   }
 
   const addRate = () => {
@@ -169,7 +139,6 @@ export default function Clients() {
           <h1>Clients</h1>
           <button onClick={() => {
             setShowForm(true)
-            setEditingClient(null)
             setForm(emptyForm)
             setSuccess('')
             setError('')
@@ -193,7 +162,7 @@ export default function Clients() {
 
         {showForm && (
           <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <h2>{editingClient ? 'Edit client' : 'Add new client'}</h2>
+            <h2>Add new client</h2>
             {error && <p className="error">{error}</p>}
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
@@ -231,41 +200,38 @@ export default function Clients() {
                 </div>
               </div>
 
-              {!editingClient && (
-                <div style={{ marginTop: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <h2>Hourly rates</h2>
-                    <button type="button" className="secondary" onClick={addRate}>+ Add rate</button>
-                  </div>
-                  {rates.map((rate, i) => (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.5rem', alignItems: 'end', marginBottom: '0.5rem' }}>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Rate type</label>
-                        <select value={rate.rate_type} onChange={e => updateRate(i, 'rate_type', e.target.value)}>
-                          {RATE_TYPES.map(t => <option key={t}>{t}</option>)}
-                        </select>
-                      </div>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Amount per hour ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={rate.amount_per_hour}
-                          onChange={e => updateRate(i, 'amount_per_hour', e.target.value)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <button type="button" className="danger" onClick={() => removeRate(i)} style={{ marginBottom: '0.75rem' }}>x</button>
-                    </div>
-                  ))}
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <h2>Hourly rates</h2>
+                  <button type="button" className="secondary" onClick={addRate}>+ Add rate</button>
                 </div>
-              )}
+                {rates.map((rate, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.5rem', alignItems: 'end', marginBottom: '0.5rem' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Rate type</label>
+                      <select value={rate.rate_type} onChange={e => updateRate(i, 'rate_type', e.target.value)}>
+                        {RATE_TYPES.map(t => <option key={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Amount per hour ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={rate.amount_per_hour}
+                        onChange={e => updateRate(i, 'amount_per_hour', e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <button type="button" className="danger" onClick={() => removeRate(i)} style={{ marginBottom: '0.75rem' }}>x</button>
+                  </div>
+                ))}
+              </div>
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
                 <button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save client'}</button>
                 <button type="button" className="secondary" onClick={() => {
                   setShowForm(false)
-                  setEditingClient(null)
                   setError('')
                 }}>Cancel</button>
               </div>
@@ -291,25 +257,19 @@ export default function Clients() {
                     <th>NDIS number</th>
                     <th>Phone</th>
                     <th>Email</th>
-                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredClients.map(client => (
                     <tr key={client.id}>
                       <td>
-                        <span style={{ color: '#2563eb', cursor: 'pointer' }}>
+                        <Link to={`/clients/${client.id}`} style={{ color: '#2563eb', textDecoration: 'none' }}>
                           {client.full_name}
-                        </span>
+                        </Link>
                       </td>
                       <td>{client.ndis_number || '—'}</td>
                       <td>{client.phone || '—'}</td>
                       <td>{client.email || '—'}</td>
-                      <td>
-                        <button className="secondary" onClick={() => startEdit(client)} style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}>
-                          Edit
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
