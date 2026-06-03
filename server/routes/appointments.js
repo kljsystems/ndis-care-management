@@ -27,11 +27,11 @@ router.get('/:id', async (req, res) => {
 
 // POST create appointment
 router.post('/', async (req, res) => {
-  const { client_id, rate_id, date, start_time, end_time, notes } = req.body
+  const { client_id, rate_id, date, end_date, start_time, end_time, notes } = req.bod
 
   const { data, error } = await supabase
     .from('appointments')
-    .insert([{ client_id, rate_id, date, start_time, end_time, notes }])
+    .insert([{ client_id, rate_id, date, end_date, start_time, end_time, notes }])
     .select()
     .single()
 

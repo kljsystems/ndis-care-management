@@ -23,6 +23,7 @@ function AppRoutes() {
       <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
       <Route path="/session-notes" element={<ProtectedRoute><SessionNotes /></ProtectedRoute>} />
       <Route path="/clients/:id" element={<ProtectedRoute><ClientDetail /></ProtectedRoute>} />
+      <Route path="/session-notes/:appointmentId" element={<ProtectedRoute><SessionNotes /></ProtectedRoute>} />
     </Routes>
   )
 }
