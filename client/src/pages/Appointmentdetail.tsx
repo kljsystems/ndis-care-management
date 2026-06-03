@@ -33,6 +33,12 @@ export default function AppointmentDetail() {
   const [appointment, setAppointment] = useState<Appointment | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    date: '', end_date: '', start_time: '', end_time: '', notes: ''
+  })
+  const [editSaving, setEditSaving] = useState(false)
+  const [editSuccess, setEditSuccess] = useState('')
 
   const fetchAppointment = async () => {
     const res = await fetch(`${API}/appointments/${id}`)
@@ -43,11 +49,40 @@ export default function AppointmentDetail() {
 
   useEffect(() => { fetchAppointment() }, [id])
 
+  useEffect(() => {
+    if (appointment) {
+      setEditForm({
+        date: appointment.date || '',
+        end_date: appointment.end_date || '',
+        start_time: appointment.start_time || '',
+        end_time: appointment.end_time || '',
+        notes: appointment.notes || ''
+      })
+    }
+  }, [appointment])
+
   const handleAction = async (action: string) => {
     setActionLoading(true)
     await fetch(`${API}/appointments/${id}/${action}`, { method: 'PATCH' })
     await fetchAppointment()
     setActionLoading(false)
+  }
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEditSaving(true)
+    const res = await fetch(`${API}/appointments/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm)
+    })
+    const data = await res.json()
+    if (!data.error) {
+      setEditSuccess('Appointment updated successfully')
+      setEditing(false)
+      fetchAppointment()
+    }
+    setEditSaving(false)
   }
 
   const formatTime = (time: string) => time ? time.substring(0, 5) : '—'
@@ -67,12 +102,8 @@ export default function AppointmentDetail() {
 
   const calcDuration = () => {
     if (!appointment) return '—'
-    const start = appointment.actual_start
-      ? new Date(appointment.actual_start)
-      : null
-    const end = appointment.actual_end
-      ? new Date(appointment.actual_end)
-      : null
+    const start = appointment.actual_start ? new Date(appointment.actual_start) : null
+    const end = appointment.actual_end ? new Date(appointment.actual_end) : null
     if (!start || !end) {
       const [sh, sm] = appointment.start_time.split(':').map(Number)
       const [eh, em] = appointment.end_time.split(':').map(Number)
@@ -80,25 +111,27 @@ export default function AppointmentDetail() {
       if (mins <= 0) return '—'
       const h = Math.floor(mins / 60)
       const m = mins % 60
-      return `${h}h ${m > 0 ? m + 'm' : ''} (scheduled)`
+      return `${h}h${m > 0 ? ` ${m}m` : ''} (scheduled)`
     }
     const mins = Math.round((end.getTime() - start.getTime()) / 60000)
+    if (mins <= 0) return '—'
     const h = Math.floor(mins / 60)
     const m = mins % 60
-    return `${h}h ${m > 0 ? m + 'm' : ''} (actual)`
+    return `${h}h${m > 0 ? ` ${m}m` : ''} (actual)`
   }
 
   const calcAmount = () => {
     if (!appointment?.client_rates?.amount_per_hour) return '—'
-    const [sh, sm] = appointment.start_time.split(':').map(Number)
-    const [eh, em] = appointment.end_time.split(':').map(Number)
-    let mins = (eh * 60 + em) - (sh * 60 + sm)
+    let mins = 0
     if (appointment.actual_start && appointment.actual_end) {
       mins = Math.round((new Date(appointment.actual_end).getTime() - new Date(appointment.actual_start).getTime()) / 60000)
+    } else {
+      const [sh, sm] = appointment.start_time.split(':').map(Number)
+      const [eh, em] = appointment.end_time.split(':').map(Number)
+      mins = (eh * 60 + em) - (sh * 60 + sm)
     }
     if (mins <= 0) return '—'
-    const hours = mins / 60
-    const amount = hours * appointment.client_rates.amount_per_hour
+    const amount = (mins / 60) * appointment.client_rates.amount_per_hour
     return `$${amount.toFixed(2)}`
   }
 
@@ -126,27 +159,35 @@ export default function AppointmentDetail() {
           </span>
         </div>
 
+        {editSuccess && <p className="success" style={{ marginBottom: '1rem' }}>{editSuccess}</p>}
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
 
           {/* Left column */}
           <div>
+            {/* Details card */}
             <div className="card" style={{ marginBottom: '1rem' }}>
               <h2 style={{ marginBottom: '1rem' }}>Details</h2>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '0.6rem 0', fontSize: '0.9rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '0.6rem 0', fontSize: '0.9rem' }}>
                 <span style={{ color: '#6b7280', fontWeight: 500 }}>Client</span>
                 <Link to={`/clients/${appointment.clients?.id}`} style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}>
                   {appointment.clients?.full_name}
                 </Link>
 
                 <span style={{ color: '#6b7280', fontWeight: 500 }}>Date</span>
-                <span>{formatDate(appointment.date)}{appointment.end_date && appointment.end_date !== appointment.date ? ` → ${formatDate(appointment.end_date)}` : ''}</span>
+                <span>
+                  {formatDate(appointment.date)}
+                  {appointment.end_date && appointment.end_date !== appointment.date
+                    ? ` → ${formatDate(appointment.end_date)}` : ''}
+                </span>
 
                 <span style={{ color: '#6b7280', fontWeight: 500 }}>Scheduled</span>
                 <span>{formatTime(appointment.start_time)} — {formatTime(appointment.end_time)}</span>
 
                 <span style={{ color: '#6b7280', fontWeight: 500 }}>Rate</span>
-                <span>{appointment.client_rates ? `${appointment.client_rates.label} — $${appointment.client_rates.amount_per_hour}/hr` : '—'}</span>
+                <span>{appointment.client_rates
+                  ? `${appointment.client_rates.label} — $${appointment.client_rates.amount_per_hour}/hr`
+                  : '—'}</span>
 
                 <span style={{ color: '#6b7280', fontWeight: 500 }}>Duration</span>
                 <span>{calcDuration()}</span>
@@ -163,16 +204,86 @@ export default function AppointmentDetail() {
               </div>
             </div>
 
-            {/* Clock in/out times */}
+            {/* Actual times card */}
             {(appointment.actual_start || appointment.actual_end) && (
               <div className="card" style={{ marginBottom: '1rem' }}>
                 <h2 style={{ marginBottom: '1rem' }}>Actual times</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '0.6rem 0', fontSize: '0.9rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '0.6rem 0', fontSize: '0.9rem' }}>
                   <span style={{ color: '#6b7280', fontWeight: 500 }}>Clocked in</span>
                   <span>{formatDateTime(appointment.actual_start)}</span>
                   <span style={{ color: '#6b7280', fontWeight: 500 }}>Clocked out</span>
                   <span>{formatDateTime(appointment.actual_end)}</span>
                 </div>
+              </div>
+            )}
+
+            {/* Edit card — only for scheduled appointments */}
+            {appointment.status === 'scheduled' && (
+              <div className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: editing ? '1rem' : 0 }}>
+                  <h2>Edit appointment</h2>
+                  <button
+                    className="secondary"
+                    onClick={() => { setEditing(!editing); setEditSuccess('') }}
+                    style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
+                  >
+                    {editing ? 'Cancel' : 'Edit'}
+                  </button>
+                </div>
+
+                {editing && (
+                  <form onSubmit={handleEdit}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
+                      <div className="form-group">
+                        <label>Start date *</label>
+                        <input
+                          type="date"
+                          value={editForm.date}
+                          onChange={e => setEditForm(prev => ({ ...prev, date: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>End date</label>
+                        <input
+                          type="date"
+                          value={editForm.end_date}
+                          min={editForm.date}
+                          onChange={e => setEditForm(prev => ({ ...prev, end_date: e.target.value }))}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Start time *</label>
+                        <input
+                          type="time"
+                          value={editForm.start_time}
+                          onChange={e => setEditForm(prev => ({ ...prev, start_time: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>End time *</label>
+                        <input
+                          type="time"
+                          value={editForm.end_time}
+                          onChange={e => setEditForm(prev => ({ ...prev, end_time: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                        <label>Notes</label>
+                        <input
+                          value={editForm.notes}
+                          onChange={e => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
+                          placeholder="Optional notes..."
+                        />
+                      </div>
+                    </div>
+                    <button type="submit" disabled={editSaving}>
+                      {editSaving ? 'Saving...' : 'Save changes'}
+                    </button>
+                  </form>
+                )}
               </div>
             )}
           </div>
@@ -181,16 +292,11 @@ export default function AppointmentDetail() {
           <div>
             <div className="card" style={{ marginBottom: '1rem' }}>
               <h2 style={{ marginBottom: '1rem' }}>Actions</h2>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {appointment.status === 'scheduled' && (
                   <>
                     <div>
-                      <button
-                        onClick={() => handleAction('clock-in')}
-                        disabled={actionLoading}
-                        style={{ width: '100%', background: '#15803d' }}
-                      >
+                      <button onClick={() => handleAction('clock-in')} disabled={actionLoading} style={{ width: '100%', background: '#15803d' }}>
                         ⏱ Clock in — start session now
                       </button>
                       <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.3rem' }}>
@@ -198,25 +304,19 @@ export default function AppointmentDetail() {
                       </p>
                     </div>
                     <div>
-                      <button
-                        onClick={() => handleAction('cancel')}
-                        disabled={actionLoading}
-                        className="danger"
-                        style={{ width: '100%' }}
-                      >
+                      <button onClick={() => handleAction('cancel')} disabled={actionLoading} className="danger" style={{ width: '100%' }}>
                         Cancel appointment
                       </button>
+                      <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.3rem' }}>
+                        Sets status to cancelled without deleting the record
+                      </p>
                     </div>
                   </>
                 )}
 
                 {appointment.status === 'in-progress' && (
                   <div>
-                    <button
-                      onClick={() => handleAction('clock-out')}
-                      disabled={actionLoading}
-                      style={{ width: '100%', background: '#854F0B' }}
-                    >
+                    <button onClick={() => handleAction('clock-out')} disabled={actionLoading} style={{ width: '100%', background: '#854F0B' }}>
                       ⏹ Clock out — end session now
                     </button>
                     <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.3rem' }}>
@@ -245,7 +345,7 @@ export default function AppointmentDetail() {
               </div>
             </div>
 
-            {/* Status indicator */}
+            {/* Status card */}
             <div className="card" style={{ borderLeft: `4px solid ${STATUS_COLORS[appointment.status] || '#6b7280'}` }}>
               <h2 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
