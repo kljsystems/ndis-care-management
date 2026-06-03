@@ -1,5 +1,26 @@
 {
   "dependencies": {
-    "@supabase/supabase-js": "^2.106.2"
-  }
+    "@supabase/supabase-js": "^2.106.2",
+    "concurrently": "^10.0.3"
+  },
+  "name": "ndis-care-management",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kljsystems/ndis-care-management.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/kljsystems/ndis-care-management/issues"
+  },
+  "homepage": "https://github.com/kljsystems/ndis-care-management#readme"
 }
