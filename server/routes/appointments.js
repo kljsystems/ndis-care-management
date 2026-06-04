@@ -27,7 +27,7 @@ router.get('/:id', async (req, res) => {
 
 // POST create appointment
 router.post('/', async (req, res) => {
-  const { client_id, rate_id, date, end_date, start_time, end_time, notes } = req.bod
+  const { client_id, rate_id, date, end_date, start_time, end_time, notes } = req.body
 
   const { data, error } = await supabase
     .from('appointments')

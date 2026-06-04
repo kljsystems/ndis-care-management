@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
   res.json(data)
 })
 
-// GET single client
+// GET single client with rates
 router.get('/:id', async (req, res) => {
   const { data, error } = await supabase
     .from('clients')
@@ -64,8 +64,9 @@ router.put('/:id', async (req, res) => {
 
   if (error) return res.status(400).json({ error: error.message })
   res.json(data)
+})
 
-// POST add rate to client
+// POST add rate to client  ← was incorrectly nested inside PUT above
 router.post('/:id/rates', async (req, res) => {
   const { rate_type, label, amount_per_hour } = req.body
   const { data, error } = await supabase
@@ -75,7 +76,6 @@ router.post('/:id/rates', async (req, res) => {
     .single()
   if (error) return res.status(400).json({ error: error.message })
   res.status(201).json(data)
-})
 })
 
 module.exports = router
