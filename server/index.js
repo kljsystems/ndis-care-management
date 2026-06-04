@@ -9,17 +9,19 @@ app.use(cors())
 app.use(express.json())
 
 // Routes
-const clientRoutes = require('./routes/clients')
+const clientRoutes      = require('./routes/clients')
 const appointmentRoutes = require('./routes/appointments')
-const invoiceRoutes = require('./routes/invoices')
+const invoicePDFRoutes  = require('./routes/invoices_pdf') 
+const invoiceRoutes     = require('./routes/invoices')
 const sessionNoteRoutes = require('./routes/sessionNotes')
-const incidentRoutes = require('./routes/incidents')
+const incidentRoutes    = require('./routes/incidents')
 
-app.use('/api/clients', clientRoutes)
-app.use('/api/appointments', appointmentRoutes)
-app.use('/api/invoices', invoiceRoutes)
+app.use('/api/clients',       clientRoutes)
+app.use('/api/appointments',  appointmentRoutes)
+app.use('/api/invoices',      invoicePDFRoutes)        
+app.use('/api/invoices',      invoiceRoutes)
 app.use('/api/session-notes', sessionNoteRoutes)
-app.use('/api/incidents', incidentRoutes)
+app.use('/api/incidents',     incidentRoutes)
 
 // Health check
 app.get('/', (req, res) => {
