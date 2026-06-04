@@ -23,35 +23,27 @@ router.get('/:id', async (req, res) => {
   res.json(data)
 })
 
-// GET client history — session notes + incidents joined chronologically (ITP126ON4-146)
+// GET client history — appointments, session notes, incidents (ITP126ON4-146)
 router.get('/:id/history', async (req, res) => {
   const clientId = req.params.id
 
-  // Fetch session notes via appointments for this client
-  const { data: notes, error: notesError } = await supabase
-    .from('session_notes')
-    .select('*, appointments!inner(date, start_time, end_time, client_id)')
-    .eq('appointments.client_id', clientId)
-    .order('created_at', { ascending: false })
+  const [apptsRes, incidentsRes] = await Promise.all([
+    supabase
+      .from('appointments')
+      .select('*, session_notes(id, notes, created_at, medications(*))')
+      .eq('client_id', clientId)
+      .order('date', { ascending: false }),
+    supabase
+      .from('incidents')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('occurred_at', { ascending: false })
+  ])
 
-  // Fetch incidents for this client
-  const { data: incidents, error: incidentsError } = await supabase
-    .from('incidents')
-    .select('*')
-    .eq('client_id', clientId)
-    .order('occurred_at', { ascending: false })
-
-  if (notesError && incidentsError) {
-    return res.status(400).json({ error: notesError.message })
-  }
-
-  // Merge and sort by date descending
-  const history = [
-    ...(notes || []).map(n => ({ ...n, record_type: 'session_note', sort_date: n.created_at })),
-    ...(incidents || []).map(i => ({ ...i, record_type: 'incident', sort_date: i.occurred_at }))
-  ].sort((a, b) => new Date(b.sort_date).getTime() - new Date(a.sort_date).getTime())
-
-  res.json(history)
+  res.json({
+    appointments: apptsRes.data || [],
+    incidents: incidentsRes.data || []
+  })
 })
 
 // POST create client
