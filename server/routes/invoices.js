@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const { data, error } = await supabase
     .from('invoices')
-    .select('*, clients(full_name, ndis_number), invoice_items(*, appointments(date, actual_start, actual_end))')
+    .select('*, clients(full_name, ndis_number), invoice_items(*, appointments(date, start_time, end_time))')
     .eq('id', req.params.id)
     .single()
 
