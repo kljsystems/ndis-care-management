@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 interface Client {
@@ -24,7 +24,7 @@ interface InvoiceItem {
   rate_per_hour: number
   rate_label: string
   amount: number
-  appointments: { date: string } | null
+  appointments: { date: string; start_time: string; end_time: string } | null
 }
 
 interface Invoice {
@@ -41,6 +41,7 @@ const API = import.meta.env.VITE_API_URL
 
 export default function Invoices() {
   const { signOut } = useAuth()
+  const navigate = useNavigate()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [completedAppointments, setCompletedAppointments] = useState<Appointment[]>([])
@@ -49,10 +50,13 @@ export default function Invoices() {
   const [selectedClientId, setSelectedClientId] = useState('')
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([])
   const [generating, setGenerating] = useState(false)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [filter, setFilter] = useState('all')
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
+
+  // ── fetch ─────────────────────────────────────────────────────────────────
 
   const fetchInvoices = async () => {
     const res = await fetch(`${API}/invoices`)
@@ -78,6 +82,8 @@ export default function Invoices() {
   }
 
   useEffect(() => { fetchInvoices(); fetchClients() }, [])
+
+  // ── generate form ─────────────────────────────────────────────────────────
 
   const handleClientChange = (clientId: string) => {
     setSelectedClientId(clientId)
@@ -135,17 +141,64 @@ export default function Invoices() {
     setGenerating(false)
   }
 
-  const handleMarkPaid = async (id: string) => {
+  // ── actions ───────────────────────────────────────────────────────────────
+
+  const handleMarkPaid = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
     await fetch(`${API}/invoices/${id}/paid`, { method: 'PATCH' })
     fetchInvoices()
   }
 
+  const handleDownloadPDF = async (e: React.MouseEvent, inv: Invoice) => {
+    e.stopPropagation()
+    setDownloadingId(inv.id)
+    try {
+      const res = await fetch(`${API}/invoices/${inv.id}/pdf`)
+      if (!res.ok) throw new Error()
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `invoice-${inv.id.slice(0, 8).toUpperCase()}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('PDF download failed. Make sure pdfkit is installed on the server.')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
+  const handleExpandInvoice = async (id: string) => {
+    if (expandedInvoice === id) { setExpandedInvoice(null); return }
+    setExpandedInvoice(id)
+    const existing = invoices.find(i => i.id === id)
+    if (!existing?.invoice_items) {
+      const res = await fetch(`${API}/invoices/${id}`)
+      const data = await res.json()
+      setInvoices(prev => prev.map(i => i.id === id ? { ...i, invoice_items: data.invoice_items } : i))
+    }
+  }
+
+  // ── helpers ───────────────────────────────────────────────────────────────
+
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
 
-  const formatTime = (t: string) => t ? t.substring(0, 5) : '—'
+  const formatTime = (t?: string | null) => t ? t.substring(0, 5) : '—'
 
   const filteredInvoices = invoices.filter(i => filter === 'all' ? true : i.status === filter)
+
+  const counts: Record<string, number> = {
+    all:   invoices.length,
+    draft: invoices.filter(i => i.status === 'draft').length,
+    sent:  invoices.filter(i => i.status === 'sent').length,
+    paid:  invoices.filter(i => i.status === 'paid').length,
+  }
+
+  // ── render ────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -160,6 +213,8 @@ export default function Invoices() {
       </nav>
 
       <div className="container">
+
+        {/* Page header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h1>Invoices</h1>
           <button onClick={() => { setShowForm(true); setSuccess(''); setError('') }}>
@@ -169,6 +224,7 @@ export default function Invoices() {
 
         {success && !showForm && <p className="success" style={{ marginBottom: '1rem' }}>{success}</p>}
 
+        {/* Generate invoice form */}
         {showForm && (
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>Generate invoice</h2>
@@ -209,7 +265,13 @@ export default function Invoices() {
                             borderTop: i > 0 ? '1px solid #e5e7eb' : 'none'
                           }}
                         >
-                          <input type="checkbox" checked={isSelected} onChange={() => toggleAppointment(appt.id)} onClick={e => e.stopPropagation()} style={{ width: 'auto', marginBottom: 0 }} />
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleAppointment(appt.id)}
+                            onClick={e => e.stopPropagation()}
+                            style={{ width: 'auto', marginBottom: 0 }}
+                          />
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
                               {formatDate(appt.date)} — {formatTime(appt.start_time)} to {formatTime(appt.end_time)}
@@ -244,73 +306,144 @@ export default function Invoices() {
               <button onClick={handleGenerate} disabled={generating || selectedAppointmentIds.length === 0}>
                 {generating ? 'Generating...' : 'Generate invoice'}
               </button>
-              <button className="secondary" onClick={() => { setShowForm(false); setError(''); setSelectedClientId(''); setSelectedAppointmentIds([]); setCompletedAppointments([]) }}>
+              <button className="secondary" onClick={() => {
+                setShowForm(false); setError(''); setSelectedClientId('')
+                setSelectedAppointmentIds([]); setCompletedAppointments([])
+              }}>
                 Cancel
               </button>
             </div>
           </div>
         )}
 
+        {/* Filter tabs with counts */}
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-          {['all', 'draft', 'sent', 'paid'].map(f => (
-            <button key={f} onClick={() => setFilter(f)} className={filter === f ? '' : 'secondary'} style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+          {(['all', 'draft', 'sent', 'paid'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={filter === f ? '' : 'secondary'}
+              style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}{' '}
+              <span style={{
+                background: filter === f ? 'rgba(255,255,255,0.25)' : '#e5e7eb',
+                color: filter === f ? 'white' : '#6b7280',
+                borderRadius: '10px', padding: '0 0.4rem', fontSize: '0.75rem', fontWeight: 600
+              }}>
+                {counts[f]}
+              </span>
             </button>
           ))}
         </div>
 
+        {/* Invoice list */}
         {loading ? <p>Loading...</p> : filteredInvoices.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', color: '#6b7280' }}><p>No invoices found.</p></div>
+          <div className="card" style={{ textAlign: 'center', color: '#6b7280' }}>
+            <p>No invoices found.</p>
+          </div>
         ) : (
-          <div className="card">
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <table>
               <thead>
-                <tr><th>Client</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th></tr>
+                <tr>
+                  <th>Client</th>
+                  <th>Date issued</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
               </thead>
               <tbody>
                 {filteredInvoices.map(inv => (
                   <>
-                    <tr key={inv.id} style={{ cursor: 'pointer' }} onClick={() => setExpandedInvoice(expandedInvoice === inv.id ? null : inv.id)}>
-                      <td>{inv.clients?.full_name}</td>
+                    <tr
+                      key={inv.id}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handleExpandInvoice(inv.id)}
+                    >
+                      {/* Client name links to detail page */}
+                      <td>
+                        <Link
+                          to={`/invoices/${inv.id}`}
+                          onClick={e => e.stopPropagation()}
+                          style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}
+                        >
+                          {inv.clients?.full_name}
+                        </Link>
+                      </td>
                       <td>{formatDate(inv.created_at)}</td>
                       <td style={{ fontWeight: 600 }}>${inv.total?.toFixed(2)}</td>
                       <td><span className={`badge badge-${inv.status}`}>{inv.status}</span></td>
-                      <td style={{ display: 'flex', gap: '0.4rem' }}>
-                        {inv.status !== 'paid' && (
-                          <button onClick={e => { e.stopPropagation(); handleMarkPaid(inv.id) }} style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', background: '#15803d' }}>
-                            Mark paid
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                          {/* PDF download */}
+                          <button
+                            onClick={e => handleDownloadPDF(e, inv)}
+                            disabled={downloadingId === inv.id}
+                            style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', background: '#2563eb' }}
+                          >
+                            {downloadingId === inv.id ? '...' : '⬇ PDF'}
                           </button>
-                        )}
-                        <span style={{ fontSize: '0.75rem', color: '#6b7280', padding: '0.2rem 0.4rem' }}>
-                          {expandedInvoice === inv.id ? '▲ hide' : '▼ details'}
-                        </span>
+                          {/* Mark paid */}
+                          {inv.status !== 'paid' && (
+                            <button
+                              onClick={e => handleMarkPaid(e, inv.id)}
+                              style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', background: '#15803d' }}
+                            >
+                              Mark paid
+                            </button>
+                          )}
+                          {/* Expand toggle */}
+                          <span style={{ fontSize: '0.75rem', color: '#6b7280', padding: '0.2rem 0.4rem' }}>
+                            {expandedInvoice === inv.id ? '▲ hide' : '▼ details'}
+                          </span>
+                        </div>
                       </td>
                     </tr>
+
+                    {/* Expanded line items */}
                     {expandedInvoice === inv.id && (
                       <tr key={`${inv.id}-exp`}>
                         <td colSpan={5} style={{ background: '#f9fafb', padding: '0.75rem 1rem' }}>
-                          <table style={{ width: '100%' }}>
-                            <thead>
-                              <tr>
-                                <th style={{ background: 'none', fontSize: '0.8rem' }}>Date</th>
-                                <th style={{ background: 'none', fontSize: '0.8rem' }}>Rate</th>
-                                <th style={{ background: 'none', fontSize: '0.8rem' }}>Hours</th>
-                                <th style={{ background: 'none', fontSize: '0.8rem' }}>Rate/hr</th>
-                                <th style={{ background: 'none', fontSize: '0.8rem' }}>Amount</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(inv.invoice_items || []).map(item => (
-                                <tr key={item.id}>
-                                  <td style={{ fontSize: '0.85rem' }}>{item.appointments ? formatDate(item.appointments.date) : '—'}</td>
-                                  <td style={{ fontSize: '0.85rem' }}>{item.rate_label}</td>
-                                  <td style={{ fontSize: '0.85rem' }}>{item.hours}h</td>
-                                  <td style={{ fontSize: '0.85rem' }}>${item.rate_per_hour}/hr</td>
-                                  <td style={{ fontSize: '0.85rem', fontWeight: 600 }}>${item.amount?.toFixed(2)}</td>
+                          {!inv.invoice_items ? (
+                            <p style={{ color: '#6b7280', fontSize: '0.85rem' }}>Loading...</p>
+                          ) : (
+                            <table style={{ width: '100%' }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ background: 'none', fontSize: '0.8rem' }}>Date</th>
+                                  <th style={{ background: 'none', fontSize: '0.8rem' }}>Rate</th>
+                                  <th style={{ background: 'none', fontSize: '0.8rem' }}>Time</th>
+                                  <th style={{ background: 'none', fontSize: '0.8rem' }}>Hours</th>
+                                  <th style={{ background: 'none', fontSize: '0.8rem' }}>Rate/hr</th>
+                                  <th style={{ background: 'none', fontSize: '0.8rem' }}>Amount</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody>
+                                {(inv.invoice_items || []).map(item => (
+                                  <tr key={item.id}>
+                                    <td style={{ fontSize: '0.85rem' }}>{item.appointments ? formatDate(item.appointments.date) : '—'}</td>
+                                    <td style={{ fontSize: '0.85rem' }}>{item.rate_label}</td>
+                                    <td style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                                      {item.appointments
+                                        ? `${formatTime(item.appointments.start_time)} – ${formatTime(item.appointments.end_time)}`
+                                        : '—'}
+                                    </td>
+                                    <td style={{ fontSize: '0.85rem' }}>{item.hours}h</td>
+                                    <td style={{ fontSize: '0.85rem' }}>${item.rate_per_hour}/hr</td>
+                                    <td style={{ fontSize: '0.85rem', fontWeight: 600 }}>${item.amount?.toFixed(2)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr>
+                                  <td colSpan={5} style={{ textAlign: 'right', fontWeight: 700, fontSize: '0.85rem', borderBottom: 'none', background: 'none' }}>Total</td>
+                                  <td style={{ fontWeight: 700, color: '#2563eb', borderBottom: 'none', background: 'none' }}>${inv.total?.toFixed(2)}</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          )}
                         </td>
                       </tr>
                     )}

@@ -1,15 +1,18 @@
+// client/src/pages/Login.tsx
+// Updated to add "Create account" link to Register page
+
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../context/AuthContext'
 
 export default function Login() {
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
-  const [step, setStep] = useState<'login' | 'totp'>('login')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [step, setStep]         = useState<'login' | 'totp'>('login')
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,7 +37,7 @@ export default function Login() {
     setLoading(false)
   }
 
-const handleTotp = async (e: React.FormEvent) => {
+  const handleTotp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
@@ -75,13 +78,7 @@ const handleTotp = async (e: React.FormEvent) => {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f5f5f5'
-    }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
       <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
         <h1 style={{ marginBottom: '0.25rem' }}>NDIS Care Manager</h1>
         <p style={{ color: '#6b7280', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
@@ -141,6 +138,15 @@ const handleTotp = async (e: React.FormEvent) => {
               Back to login
             </button>
           </form>
+        )}
+
+        {step === 'login' && (
+          <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.85rem', color: '#6b7280' }}>
+            Don't have an account?{' '}
+            <Link to="/register" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}>
+              Create account
+            </Link>
+          </p>
         )}
       </div>
     </div>
