@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const { data, error } = await supabase
     .from('appointments')
-    .select('*, clients(full_name), client_rates(label, amount_per_hour)')
+    .select('*, clients(full_name, id), client_rates(label, amount_per_hour)')
     .eq('id', req.params.id)
     .single()
 
@@ -27,7 +27,7 @@ router.get('/:id', async (req, res) => {
 
 // POST create appointment
 router.post('/', async (req, res) => {
-  const { client_id, rate_id, date, end_date, start_time, end_time, notes } = req.body
+  const { client_id, rate_id, date, end_date, start_time, end_time, notes } = req.body  // fixed: was req.bod
 
   const { data, error } = await supabase
     .from('appointments')
@@ -41,11 +41,11 @@ router.post('/', async (req, res) => {
 
 // PUT update appointment
 router.put('/:id', async (req, res) => {
-  const { date, start_time, end_time, notes, rate_id } = req.body
+  const { date, end_date, start_time, end_time, notes, rate_id } = req.body
 
   const { data, error } = await supabase
     .from('appointments')
-    .update({ date, start_time, end_time, notes, rate_id })
+    .update({ date, end_date, start_time, end_time, notes, rate_id })
     .eq('id', req.params.id)
     .select()
     .single()
@@ -105,7 +105,7 @@ router.patch('/:id/clock-out', async (req, res) => {
 
   if (fetchError) return res.status(400).json({ error: fetchError.message })
 
-  const hours = (new Date(actual_end) - new Date(appt.actual_start)) / 3600000
+  const hours = (new Date(actual_end).getTime() - new Date(appt.actual_start).getTime()) / 3600000
 
   const { data, error } = await supabase
     .from('appointments')

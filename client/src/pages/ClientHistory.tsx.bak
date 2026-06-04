@@ -1,0 +1,269 @@
+// client/src/pages/ClientHistory.tsx
+
+import { useEffect, useState } from 'react'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+
+interface Medication {
+  id: string
+  name: string
+  dose: string
+  time_given: string
+  notes: string
+}
+
+interface SessionNote {
+  id: string
+  notes: string
+  created_at: string
+  medications: Medication[]
+}
+
+interface Appointment {
+  id: string
+  date: string
+  start_time: string
+  end_time: string
+  status: string
+  session_notes: SessionNote | SessionNote[] | null
+}
+
+interface Incident {
+  id: string
+  type: string
+  description: string
+  actions_taken: string
+  occurred_at: string
+  appointment_id: string | null
+}
+
+interface Client {
+  id: string
+  full_name: string
+}
+
+const API = import.meta.env.VITE_API_URL
+
+export default function ClientHistory() {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const { signOut } = useAuth()
+
+  const [client, setClient]             = useState<Client | null>(null)
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [incidents, setIncidents]       = useState<Incident[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState('')
+  const [filter, setFilter]             = useState<'all' | 'notes' | 'incidents'>('all')
+
+  useEffect(() => {
+    if (!id) return
+    const load = async () => {
+      try {
+        const [clientRes, historyRes] = await Promise.all([
+          fetch(`${API}/clients/${id}`),
+          fetch(`${API}/clients/${id}/history`)
+        ])
+
+        const clientData  = await clientRes.json()
+        const historyData = await historyRes.json()
+
+        if (clientData.error) {
+          setError(`Client error: ${clientData.error}`)
+        } else {
+          setClient(clientData)
+        }
+
+        if (historyData.error) {
+          setError(`History error: ${historyData.error}`)
+        } else {
+          setAppointments(Array.isArray(historyData.appointments) ? historyData.appointments : [])
+          setIncidents(Array.isArray(historyData.incidents) ? historyData.incidents : [])
+        }
+      } catch (e: any) {
+        setError(`Failed to load: ${e.message}`)
+      }
+      setLoading(false)
+    }
+    load()
+  }, [id])
+
+  const formatDate = (d: string) =>
+    new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+
+  const formatTime = (t: string) => t ? t.substring(0, 5) : '—'
+
+  const formatDateTime = (iso: string) =>
+    new Date(iso).toLocaleString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+  const getNote = (appt: Appointment): SessionNote | null => {
+    if (!appt.session_notes) return null
+    if (Array.isArray(appt.session_notes)) return appt.session_notes[0] ?? null
+    return appt.session_notes
+  }
+
+  const apptWithNotes = appointments.filter(a => getNote(a))
+
+  const counts = {
+    all:       appointments.length,
+    notes:     apptWithNotes.length,
+    incidents: incidents.length
+  }
+
+  const nav = (
+    <nav>
+      <span style={{ fontWeight: 700, fontSize: '1.1rem', marginRight: 'auto' }}>NDIS Care Manager</span>
+      <Link to="/">Dashboard</Link>
+      <Link to="/clients">Clients</Link>
+      <Link to="/appointments">Appointments</Link>
+      <Link to="/invoices">Invoices</Link>
+      <Link to="/session-notes">Session Notes</Link>
+      <button onClick={signOut} style={{ background: 'rgba(255,255,255,0.2)', marginLeft: '1rem' }}>Log out</button>
+    </nav>
+  )
+
+  if (loading) return <>{nav}<div className="container"><p>Loading...</p></div></>
+
+  if (error) return (
+    <>{nav}
+      <div className="container">
+        <button className="secondary" onClick={() => navigate(`/clients/${id}`)} style={{ marginBottom: '1rem', padding: '0.25rem 0.75rem' }}>← Back</button>
+        <div className="card" style={{ borderLeft: '4px solid #dc2626' }}>
+          <p className="error">{error}</p>
+          <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
+            API URL: {API}/clients/{id}/history
+          </p>
+        </div>
+      </div>
+    </>
+  )
+
+  return (
+    <>
+      {nav}
+      <div className="container">
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+          <button className="secondary" onClick={() => navigate(`/clients/${id}`)} style={{ padding: '0.25rem 0.75rem' }}>
+            ← Back
+          </button>
+          <div>
+            <h1 style={{ margin: 0 }}>{client?.full_name ?? 'Client'} — History</h1>
+            <p style={{ color: '#6b7280', fontSize: '0.85rem', marginTop: '0.2rem' }}>
+              All appointments, session notes and incident reports
+            </p>
+          </div>
+        </div>
+
+        {/* Filter tabs */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+          {([
+            { key: 'all',       label: 'All appointments' },
+            { key: 'notes',     label: '📝 With session notes' },
+            { key: 'incidents', label: '⚠ Incidents' },
+          ] as const).map(f => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={filter === f.key ? '' : 'secondary'}
+              style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
+            >
+              {f.label}
+              <span style={{
+                marginLeft: '0.4rem',
+                background: filter === f.key ? 'rgba(255,255,255,0.25)' : '#e5e7eb',
+                color: filter === f.key ? 'white' : '#6b7280',
+                borderRadius: '10px', padding: '0 0.4rem', fontSize: '0.75rem', fontWeight: 600
+              }}>
+                {counts[f.key]}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+          {/* All appointments */}
+          {(filter === 'all' || filter === 'notes') && (() => {
+            const list = filter === 'notes' ? apptWithNotes : appointments
+            if (list.length === 0) return (
+              <div className="card" style={{ textAlign: 'center', color: '#6b7280' }}>
+                <p>{filter === 'notes' ? 'No session notes written yet.' : 'No appointments found for this client.'}</p>
+              </div>
+            )
+            return list.map(appt => {
+              const note = getNote(appt)
+              const linkedIncidents = incidents.filter(i => i.appointment_id === appt.id)
+              return (
+                <div key={appt.id} className="card" style={{
+                  borderLeft: `4px solid ${
+                    appt.status === 'completed'   ? '#15803d' :
+                    appt.status === 'cancelled'   ? '#dc2626' :
+                    appt.status === 'in-progress' ? '#854F0B' : '#2563eb'
+                  }`, padding: '1rem 1.25rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (note || linkedIncidents.length) ? '0.75rem' : 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{formatDate(appt.date)}</span>
+                      <span style={{ color: '#6b7280', fontSize: '0.85rem' }}>{formatTime(appt.start_time)} – {formatTime(appt.end_time)}</span>
+                      <span className={`badge badge-${appt.status}`}>{appt.status}</span>
+                    </div>
+                    <Link to={`/appointments/${appt.id}`} style={{ fontSize: '0.8rem', color: '#2563eb', textDecoration: 'none' }}>
+                      View →
+                    </Link>
+                  </div>
+
+                  {note && (
+                    <div style={{ background: '#f0f9ff', borderRadius: '6px', padding: '0.75rem', marginBottom: linkedIncidents.length ? '0.5rem' : 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, background: '#dbeafe', color: '#1d4ed8', padding: '0.1rem 0.5rem', borderRadius: '10px' }}>📝 Session note</span>
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{formatDateTime(note.created_at)}</span>
+                      </div>
+                      <p style={{ fontSize: '0.88rem', color: '#374151', whiteSpace: 'pre-wrap', marginBottom: note.medications?.length ? '0.4rem' : 0 }}>{note.notes}</p>
+                      {note.medications?.length > 0 && (
+                        <p style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                          <strong>Medications:</strong> {note.medications.map(m => `${m.name}${m.dose ? ` ${m.dose}` : ''}`).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {linkedIncidents.map(inc => (
+                    <div key={inc.id} style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.75rem', marginTop: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, background: '#fee2e2', color: '#dc2626', padding: '0.1rem 0.5rem', borderRadius: '10px' }}>⚠ {inc.type}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{formatDateTime(inc.occurred_at)}</span>
+                      </div>
+                      <p style={{ fontSize: '0.88rem', color: '#374151' }}>{inc.description}</p>
+                      {inc.actions_taken && <p style={{ fontSize: '0.8rem', color: '#6b7280' }}>Actions: {inc.actions_taken}</p>}
+                    </div>
+                  ))}
+                </div>
+              )
+            })
+          })()}
+
+          {/* Incidents tab */}
+          {filter === 'incidents' && (
+            incidents.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', color: '#6b7280' }}>
+                <p>No incidents recorded for this client.</p>
+              </div>
+            ) : incidents.map(inc => (
+              <div key={inc.id} className="card" style={{ borderLeft: '4px solid #dc2626', padding: '1rem 1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, background: '#fee2e2', color: '#dc2626', padding: '0.1rem 0.5rem', borderRadius: '10px' }}>⚠ {inc.type}</span>
+                  <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>{formatDateTime(inc.occurred_at)}</span>
+                </div>
+                <p style={{ fontSize: '0.9rem', color: '#374151', marginBottom: inc.actions_taken ? '0.35rem' : 0 }}>{inc.description}</p>
+                {inc.actions_taken && <p style={{ fontSize: '0.82rem', color: '#6b7280' }}>Actions taken: {inc.actions_taken}</p>}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </>
+  )
+}

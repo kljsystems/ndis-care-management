@@ -143,10 +143,13 @@ export default function ClientDetail() {
 
       <div className="container">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-          <button className="secondary" onClick={() => navigate('/clients')} style={{ padding: '0.25rem 0.75rem' }}>
+        <button className="secondary" onClick={() => navigate('/clients')} style={{ padding: '0.25rem 0.75rem' }}>
             ← Back
-          </button>
-          <h1>{client.full_name}</h1>
+        </button>
+        <h1>{client.full_name}</h1>
+        <Link to={`/clients/${id}/history`}>
+            <button className="secondary" style={{ padding: '0.25rem 0.75rem' }}>📋 View history</button>
+        </Link>
         </div>
 
         {success && <p className="success" style={{ marginBottom: '1rem' }}>{success}</p>}
