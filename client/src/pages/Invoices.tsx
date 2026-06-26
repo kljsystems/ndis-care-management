@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import Nav from '../components/Nav'
 
 interface Client {
@@ -41,7 +41,6 @@ const API = import.meta.env.VITE_API_URL
 
 export default function Invoices() {
 
-  const navigate = useNavigate()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [completedAppointments, setCompletedAppointments] = useState<Appointment[]>([])

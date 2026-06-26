@@ -2,7 +2,7 @@
 // ITP126ON4-15 — User registration with email, password, validation & errors
 
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase } from '../context/AuthContext'
 
 // ── password strength scorer ──────────────────────────────────────────────────
@@ -22,7 +22,6 @@ function getStrength(password: string): { score: number; label: string; color: s
 }
 
 export default function Register() {
-  const navigate = useNavigate()
   const [email, setEmail]           = useState('')
   const [password, setPassword]     = useState('')
   const [confirm, setConfirm]       = useState('')

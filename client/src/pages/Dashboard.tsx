@@ -96,7 +96,7 @@ export default function Dashboard() {
         )
       )
       setClientsNoRate(withRatesRes.filter(c => !c.client_rates || c.client_rates.length === 0))
-      setAlerts(alertData && !alertData.error ? alertData : { long_sessions: [], overdue_invoices: [] })
+      setAlerts(alertData?.long_sessions ? alertData : { long_sessions: [], overdue_invoices: [] })
 
       setLoading(false)
     }

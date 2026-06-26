@@ -2,7 +2,7 @@
 // ITP126ON4-21 — Write and view session notes for a completed appointment
 
 import { useEffect, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import Nav from '../components/Nav'
 
 interface SessionNote {
