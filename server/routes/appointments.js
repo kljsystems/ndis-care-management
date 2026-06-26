@@ -93,6 +93,27 @@ router.patch('/:id/clock-in', async (req, res) => {
   res.json(data)
 })
 
+// PATCH manual entry — sets actual times without live clock-in/out
+router.patch('/:id/manual-entry', async (req, res) => {
+  const { actual_start, actual_end } = req.body
+  if (!actual_start || !actual_end) {
+    return res.status(400).json({ error: 'actual_start and actual_end are required' })
+  }
+  if (new Date(actual_end) <= new Date(actual_start)) {
+    return res.status(400).json({ error: 'actual_end must be after actual_start' })
+  }
+
+  const { data, error } = await supabase
+    .from('appointments')
+    .update({ actual_start, actual_end, is_manual_entry: true, status: 'completed' })
+    .eq('id', req.params.id)
+    .select()
+    .single()
+
+  if (error) return res.status(400).json({ error: error.message })
+  res.json(data)
+})
+
 // PATCH clock out
 router.patch('/:id/clock-out', async (req, res) => {
   const actual_end = new Date().toISOString()

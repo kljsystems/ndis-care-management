@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import Nav from '../components/Nav'
 
 interface Appointment {
   id: string
@@ -15,6 +15,7 @@ interface Appointment {
   notes: string
   actual_start: string | null
   actual_end: string | null
+  is_manual_entry: boolean
   client_id: string
   clients: { full_name: string; id: string }
   client_rates: { label: string; amount_per_hour: number } | null
@@ -51,7 +52,7 @@ const INCIDENT_TYPES = [
 export default function AppointmentDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { signOut } = useAuth()
+
 
   const [appointment, setAppointment] = useState<Appointment | null>(null)
   const [incidents, setIncidents]     = useState<Incident[]>([])
@@ -61,6 +62,15 @@ export default function AppointmentDetail() {
   const [editForm, setEditForm]       = useState({ date: '', end_date: '', start_time: '', end_time: '', notes: '' })
   const [editSaving, setEditSaving]   = useState(false)
   const [editSuccess, setEditSuccess] = useState('')
+
+  // live timer
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+
+  // manual entry state
+  const [showManualEntry, setShowManualEntry] = useState(false)
+  const [manualForm, setManualForm] = useState({ actual_start: '', actual_end: '' })
+  const [manualSaving, setManualSaving] = useState(false)
+  const [manualError, setManualError] = useState('')
 
   // incident form state
   const [showIncidentForm, setShowIncidentForm] = useState(false)
@@ -86,6 +96,17 @@ export default function AppointmentDetail() {
   }
 
   useEffect(() => { fetchAppointment() }, [id])
+
+  useEffect(() => {
+    if (appointment?.status === 'in-progress' && appointment.actual_start && !appointment.actual_end) {
+      const tick = () => setElapsedSeconds(
+        Math.floor((Date.now() - new Date(appointment.actual_start!).getTime()) / 1000)
+      )
+      tick()
+      const timer = setInterval(tick, 1000)
+      return () => clearInterval(timer)
+    }
+  }, [appointment?.status, appointment?.actual_start])
 
   useEffect(() => {
     if (appointment) {
@@ -124,6 +145,34 @@ export default function AppointmentDetail() {
     setEditSaving(false)
   }
 
+  const handleManualEntry = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setManualError('')
+    if (!manualForm.actual_start || !manualForm.actual_end) {
+      setManualError('Both start and end times are required.')
+      return
+    }
+    if (new Date(manualForm.actual_end) <= new Date(manualForm.actual_start)) {
+      setManualError('End time must be after start time.')
+      return
+    }
+    setManualSaving(true)
+    const res = await fetch(`${API}/appointments/${id}/manual-entry`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(manualForm)
+    })
+    const data = await res.json()
+    if (data.error) {
+      setManualError(data.error)
+    } else {
+      setShowManualEntry(false)
+      setManualForm({ actual_start: '', actual_end: '' })
+      fetchAppointment()
+    }
+    setManualSaving(false)
+  }
+
   // ITP126ON4-139: incident report form submit
   const handleIncidentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -159,6 +208,13 @@ export default function AppointmentDetail() {
   }
 
   const formatTime = (time: string) => time ? time.substring(0, 5) : '—'
+
+  const formatElapsed = (secs: number) => {
+    const h = Math.floor(secs / 3600)
+    const m = Math.floor((secs % 3600) / 60)
+    const s = secs % 60
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  }
 
   const formatDateTime = (iso: string | null) => {
     if (!iso) return '—'
@@ -211,15 +267,7 @@ export default function AppointmentDetail() {
 
   return (
     <>
-      <nav>
-        <span style={{ fontWeight: 700, fontSize: '1.1rem', marginRight: 'auto' }}>NDIS Care Manager</span>
-        <Link to="/">Dashboard</Link>
-        <Link to="/clients">Clients</Link>
-        <Link to="/appointments">Appointments</Link>
-        <Link to="/invoices">Invoices</Link>
-        <Link to="/session-notes">Session Notes</Link>
-        <button onClick={signOut} style={{ background: 'rgba(255,255,255,0.2)', marginLeft: '1rem' }}>Log out</button>
-      </nav>
+      <Nav />
 
       <div className="container">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -260,7 +308,10 @@ export default function AppointmentDetail() {
                   : '—'}</span>
 
                 <span style={{ color: '#6b7280', fontWeight: 500 }}>Duration</span>
-                <span>{calcDuration()}</span>
+                {appointment.status === 'in-progress' && appointment.actual_start && !appointment.actual_end
+                  ? <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#854F0B' }}>{formatElapsed(elapsedSeconds)}</span>
+                  : <span>{calcDuration()}</span>
+                }
 
                 <span style={{ color: '#6b7280', fontWeight: 500 }}>Est. amount</span>
                 <span style={{ fontWeight: 600, color: '#15803d' }}>{calcAmount()}</span>
@@ -275,11 +326,18 @@ export default function AppointmentDetail() {
             {/* Actual times */}
             {(appointment.actual_start || appointment.actual_end) && (
               <div className="card" style={{ marginBottom: '1rem' }}>
-                <h2 style={{ marginBottom: '1rem' }}>Actual times</h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h2 style={{ margin: 0 }}>Actual times</h2>
+                  {appointment.is_manual_entry && (
+                    <span style={{ fontSize: '0.75rem', background: '#f3f4f6', color: '#6b7280', padding: '0.2rem 0.6rem', borderRadius: '10px', border: '1px solid #e5e7eb', fontWeight: 500 }}>
+                      Manually entered
+                    </span>
+                  )}
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '0.6rem 0', fontSize: '0.9rem' }}>
-                  <span style={{ color: '#6b7280', fontWeight: 500 }}>Clocked in</span>
+                  <span style={{ color: '#6b7280', fontWeight: 500 }}>Start</span>
                   <span>{formatDateTime(appointment.actual_start)}</span>
-                  <span style={{ color: '#6b7280', fontWeight: 500 }}>Clocked out</span>
+                  <span style={{ color: '#6b7280', fontWeight: 500 }}>End</span>
                   <span>{formatDateTime(appointment.actual_end)}</span>
                 </div>
               </div>
@@ -357,6 +415,46 @@ export default function AppointmentDetail() {
                     </button>
                     <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.3rem' }}>Records the current time as the actual session start</p>
                   </div>
+
+                  {/* Manual entry */}
+                  <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showManualEntry ? '0.75rem' : 0 }}>
+                      <div>
+                        <p style={{ fontWeight: 500, fontSize: '0.9rem', margin: 0 }}>Enter times manually</p>
+                        {!showManualEntry && <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.2rem' }}>Use if you forgot to clock in/out</p>}
+                      </div>
+                      <button className="secondary" onClick={() => { setShowManualEntry(!showManualEntry); setManualError('') }} style={{ padding: '0.25rem 0.6rem', fontSize: '0.8rem' }}>
+                        {showManualEntry ? 'Cancel' : 'Enter'}
+                      </button>
+                    </div>
+                    {showManualEntry && (
+                      <form onSubmit={handleManualEntry}>
+                        {manualError && <p className="error" style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>{manualError}</p>}
+                        <div className="form-group">
+                          <label style={{ fontSize: '0.85rem' }}>Actual start *</label>
+                          <input
+                            type="datetime-local"
+                            value={manualForm.actual_start}
+                            onChange={e => setManualForm(p => ({ ...p, actual_start: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ fontSize: '0.85rem' }}>Actual end *</label>
+                          <input
+                            type="datetime-local"
+                            value={manualForm.actual_end}
+                            onChange={e => setManualForm(p => ({ ...p, actual_end: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <button type="submit" disabled={manualSaving} style={{ width: '100%', background: '#6b7280' }}>
+                          {manualSaving ? 'Saving...' : 'Save manual entry'}
+                        </button>
+                      </form>
+                    )}
+                  </div>
+
                   <div>
                     <button onClick={() => handleAction('cancel')} disabled={actionLoading} className="danger" style={{ width: '100%' }}>
                       Cancel appointment
@@ -374,7 +472,7 @@ export default function AppointmentDetail() {
                   </div>
                 )}
 
-                {appointment.status === 'completed' && (
+                {appointment.status === 'completed' && (<>
                   <div>
                     <Link
                       to={`/session-notes/${appointment.id}`}
@@ -384,7 +482,46 @@ export default function AppointmentDetail() {
                     </Link>
                     <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.3rem' }}>Document what occurred during this session</p>
                   </div>
-                )}
+
+                  {/* Correct times on completed appointment */}
+                  <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showManualEntry ? '0.75rem' : 0 }}>
+                      <div>
+                        <p style={{ fontWeight: 500, fontSize: '0.9rem', margin: 0 }}>Correct session times</p>
+                        {!showManualEntry && <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.2rem' }}>Override actual start/end if incorrect</p>}
+                      </div>
+                      <button className="secondary" onClick={() => { setShowManualEntry(!showManualEntry); setManualError('') }} style={{ padding: '0.25rem 0.6rem', fontSize: '0.8rem' }}>
+                        {showManualEntry ? 'Cancel' : 'Edit'}
+                      </button>
+                    </div>
+                    {showManualEntry && (
+                      <form onSubmit={handleManualEntry}>
+                        {manualError && <p className="error" style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>{manualError}</p>}
+                        <div className="form-group">
+                          <label style={{ fontSize: '0.85rem' }}>Actual start *</label>
+                          <input
+                            type="datetime-local"
+                            value={manualForm.actual_start}
+                            onChange={e => setManualForm(p => ({ ...p, actual_start: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ fontSize: '0.85rem' }}>Actual end *</label>
+                          <input
+                            type="datetime-local"
+                            value={manualForm.actual_end}
+                            onChange={e => setManualForm(p => ({ ...p, actual_end: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <button type="submit" disabled={manualSaving} style={{ width: '100%', background: '#6b7280' }}>
+                          {manualSaving ? 'Saving...' : 'Update times'}
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </>)}
 
                 {appointment.status === 'cancelled' && (
                   <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>This appointment has been cancelled.</p>

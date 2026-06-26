@@ -71,7 +71,7 @@ router.put('/:id', async (req, res) => {
   res.json(data)
 })
 
-// POST add rate to client  ← was incorrectly nested inside PUT above
+// POST add rate to client
 router.post('/:id/rates', async (req, res) => {
   const { rate_type, label, amount_per_hour } = req.body
   const { data, error } = await supabase
@@ -81,6 +81,31 @@ router.post('/:id/rates', async (req, res) => {
     .single()
   if (error) return res.status(400).json({ error: error.message })
   res.status(201).json(data)
+})
+
+// PUT update rate
+router.put('/:id/rates/:rateId', async (req, res) => {
+  const { rate_type, label, amount_per_hour } = req.body
+  const { data, error } = await supabase
+    .from('client_rates')
+    .update({ rate_type, label, amount_per_hour })
+    .eq('id', req.params.rateId)
+    .eq('client_id', req.params.id)
+    .select()
+    .single()
+  if (error) return res.status(400).json({ error: error.message })
+  res.json(data)
+})
+
+// DELETE rate
+router.delete('/:id/rates/:rateId', async (req, res) => {
+  const { error } = await supabase
+    .from('client_rates')
+    .delete()
+    .eq('id', req.params.rateId)
+    .eq('client_id', req.params.id)
+  if (error) return res.status(400).json({ error: error.message })
+  res.status(204).send()
 })
 
 module.exports = router

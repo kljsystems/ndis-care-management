@@ -10,13 +10,13 @@
 
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import Nav from '../components/Nav'
 import { supabase } from '../context/AuthContext'
 
 type Step = 'check' | 'already_enabled' | 'enroll' | 'verify' | 'success'
 
 export default function TwoFactorSetup() {
-  const { signOut } = useAuth()
+
   const navigate = useNavigate()
 
   const [step, setStep]           = useState<Step>('check')
@@ -112,15 +112,7 @@ export default function TwoFactorSetup() {
 
   return (
     <>
-      <nav>
-        <span style={{ fontWeight: 700, fontSize: '1.1rem', marginRight: 'auto' }}>NDIS Care Manager</span>
-        <Link to="/">Dashboard</Link>
-        <Link to="/clients">Clients</Link>
-        <Link to="/appointments">Appointments</Link>
-        <Link to="/invoices">Invoices</Link>
-        <Link to="/session-notes">Session Notes</Link>
-        <button onClick={signOut} style={{ background: 'rgba(255,255,255,0.2)', marginLeft: '1rem' }}>Log out</button>
-      </nav>
+      <Nav />
 
       <div className="container">
         <Link to="/" style={{ color: '#6b7280', fontSize: '0.9rem', textDecoration: 'none', display: 'inline-block', marginBottom: '1rem' }}>

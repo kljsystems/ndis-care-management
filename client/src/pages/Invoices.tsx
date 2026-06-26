@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import Nav from '../components/Nav'
 
 interface Client {
   id: string
@@ -40,7 +40,7 @@ interface Invoice {
 const API = import.meta.env.VITE_API_URL
 
 export default function Invoices() {
-  const { signOut } = useAuth()
+
   const navigate = useNavigate()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -202,15 +202,7 @@ export default function Invoices() {
 
   return (
     <>
-      <nav>
-        <span style={{ fontWeight: 700, fontSize: '1.1rem', marginRight: 'auto' }}>NDIS Care Manager</span>
-        <Link to="/">Dashboard</Link>
-        <Link to="/clients">Clients</Link>
-        <Link to="/appointments">Appointments</Link>
-        <Link to="/invoices">Invoices</Link>
-        <Link to="/session-notes">Session Notes</Link>
-        <button onClick={signOut} style={{ background: 'rgba(255,255,255,0.2)', marginLeft: '1rem' }}>Log out</button>
-      </nav>
+      <Nav />
 
       <div className="container">
 

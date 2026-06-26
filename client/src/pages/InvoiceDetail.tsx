@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import Nav from '../components/Nav'
 
 const API = import.meta.env.VITE_API_URL
 
@@ -64,7 +64,7 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default function InvoiceDetail() {
   const { id } = useParams<{ id: string }>()
-  const { signOut } = useAuth()
+
   const navigate = useNavigate()
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [loading, setLoading] = useState(true)
@@ -118,15 +118,7 @@ export default function InvoiceDetail() {
   if (loading) {
     return (
       <>
-        <nav>
-          <span style={{ fontWeight: 700, fontSize: '1.1rem', marginRight: 'auto' }}>NDIS Care Manager</span>
-          <Link to="/">Dashboard</Link>
-          <Link to="/clients">Clients</Link>
-          <Link to="/appointments">Appointments</Link>
-          <Link to="/invoices">Invoices</Link>
-          <Link to="/session-notes">Session Notes</Link>
-          <button onClick={signOut} style={{ background: 'rgba(255,255,255,0.2)', marginLeft: '1rem' }}>Log out</button>
-        </nav>
+        <Nav />
         <div className="container"><p>Loading...</p></div>
       </>
     )
@@ -135,10 +127,7 @@ export default function InvoiceDetail() {
   if (error || !invoice) {
     return (
       <>
-        <nav>
-          <span style={{ fontWeight: 700, fontSize: '1.1rem', marginRight: 'auto' }}>NDIS Care Manager</span>
-          <Link to="/invoices">← Back to invoices</Link>
-        </nav>
+        <Nav />
         <div className="container">
           <p className="error">{error ?? 'Invoice not found.'}</p>
         </div>
@@ -148,15 +137,7 @@ export default function InvoiceDetail() {
 
   return (
     <>
-      <nav>
-        <span style={{ fontWeight: 700, fontSize: '1.1rem', marginRight: 'auto' }}>NDIS Care Manager</span>
-        <Link to="/">Dashboard</Link>
-        <Link to="/clients">Clients</Link>
-        <Link to="/appointments">Appointments</Link>
-        <Link to="/invoices">Invoices</Link>
-        <Link to="/session-notes">Session Notes</Link>
-        <button onClick={signOut} style={{ background: 'rgba(255,255,255,0.2)', marginLeft: '1rem' }}>Log out</button>
-      </nav>
+      <Nav />
 
       <div className="container">
         {/* Back link */}

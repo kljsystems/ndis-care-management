@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import Nav from '../components/Nav'
 
 const API = import.meta.env.VITE_API_URL
 
 export default function ClientHistory() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { signOut } = useAuth()
+
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -30,15 +30,7 @@ export default function ClientHistory() {
 
   return (
     <>
-      <nav>
-        <span style={{ fontWeight: 700, fontSize: '1.1rem', marginRight: 'auto' }}>NDIS Care Manager</span>
-        <Link to="/">Dashboard</Link>
-        <Link to="/clients">Clients</Link>
-        <Link to="/appointments">Appointments</Link>
-        <Link to="/invoices">Invoices</Link>
-        <Link to="/session-notes">Session Notes</Link>
-        <button onClick={signOut} style={{ background: 'rgba(255,255,255,0.2)', marginLeft: '1rem' }}>Log out</button>
-      </nav>
+      <Nav />
       <div className="container">
         <button className="secondary" onClick={() => navigate(`/clients/${id}`)} style={{ marginBottom: '1rem', padding: '0.25rem 0.75rem' }}>← Back</button>
         <h1>Client History</h1>

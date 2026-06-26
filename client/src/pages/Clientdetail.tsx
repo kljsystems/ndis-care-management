@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import Nav from '../components/Nav'
 
 interface Rate {
   id: string
@@ -38,7 +38,7 @@ const RATE_TYPES = [
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { signOut } = useAuth()
+
 
   const [client, setClient] = useState<Client | null>(null)
   const [loading, setLoading] = useState(true)
@@ -55,6 +55,9 @@ export default function ClientDetail() {
   const [showAddRate, setShowAddRate] = useState(false)
   const [newRate, setNewRate] = useState({ rate_type: 'Weekday Daytime', label: 'Weekday Daytime', amount_per_hour: '' })
   const [savingRate, setSavingRate] = useState(false)
+  const [editingRateId, setEditingRateId] = useState<string | null>(null)
+  const [editRate, setEditRate] = useState({ rate_type: '', label: '', amount_per_hour: '' })
+  const [deletingRateId, setDeletingRateId] = useState<string | null>(null)
 
   const fetchClient = async () => {
     const res = await fetch(`${API}/clients/${id}`)
@@ -99,6 +102,38 @@ export default function ClientDetail() {
     setSaving(false)
   }
 
+  const startEditRate = (rate: Rate) => {
+    setEditingRateId(rate.id)
+    setEditRate({ rate_type: rate.rate_type, label: rate.label, amount_per_hour: String(rate.amount_per_hour) })
+  }
+
+  const handleEditRate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingRateId) return
+    const res = await fetch(`${API}/clients/${id}/rates/${editingRateId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rate_type: editRate.rate_type,
+        label: editRate.label,
+        amount_per_hour: parseFloat(editRate.amount_per_hour)
+      })
+    })
+    const data = await res.json()
+    if (!data.error) {
+      setEditingRateId(null)
+      fetchClient()
+    }
+  }
+
+  const handleDeleteRate = async (rateId: string) => {
+    if (!window.confirm('Delete this rate? Any appointments using it will keep their existing rate.')) return
+    setDeletingRateId(rateId)
+    await fetch(`${API}/clients/${id}/rates/${rateId}`, { method: 'DELETE' })
+    setDeletingRateId(null)
+    fetchClient()
+  }
+
   const handleAddRate = async (e: React.FormEvent) => {
     e.preventDefault()
     setSavingRate(true)
@@ -127,19 +162,7 @@ export default function ClientDetail() {
 
   return (
     <>
-      <nav>
-        <span style={{ fontWeight: 700, fontSize: '1.1rem', marginRight: 'auto' }}>
-          NDIS Care Manager
-        </span>
-        <Link to="/">Dashboard</Link>
-        <Link to="/clients">Clients</Link>
-        <Link to="/appointments">Appointments</Link>
-        <Link to="/invoices">Invoices</Link>
-        <Link to="/session-notes">Session Notes</Link>
-        <button onClick={signOut} style={{ background: 'rgba(255,255,255,0.2)', marginLeft: '1rem' }}>
-          Log out
-        </button>
-      </nav>
+      <Nav />
 
       <div className="container">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -240,14 +263,51 @@ export default function ClientDetail() {
                 <tr>
                   <th>Rate type</th>
                   <th>Amount per hour</th>
+                  <th style={{ width: '120px' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {client.client_rates.map(rate => (
-                  <tr key={rate.id}>
-                    <td>{rate.label}</td>
-                    <td>${rate.amount_per_hour.toFixed(2)}/hr</td>
-                  </tr>
+                  editingRateId === rate.id ? (
+                    <tr key={rate.id}>
+                      <td colSpan={3} style={{ padding: '0.5rem' }}>
+                        <form onSubmit={handleEditRate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto', gap: '0.5rem', alignItems: 'center' }}>
+                          <select value={editRate.rate_type} onChange={e => setEditRate({ ...editRate, rate_type: e.target.value, label: e.target.value })} style={{ marginBottom: 0 }}>
+                            {RATE_TYPES.map(t => <option key={t}>{t}</option>)}
+                          </select>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editRate.amount_per_hour}
+                            onChange={e => setEditRate({ ...editRate, amount_per_hour: e.target.value })}
+                            placeholder="0.00"
+                            required
+                            style={{ marginBottom: 0 }}
+                          />
+                          <button type="submit" style={{ padding: '0.3rem 0.75rem', fontSize: '0.85rem' }}>Save</button>
+                          <button type="button" className="secondary" onClick={() => setEditingRateId(null)} style={{ padding: '0.3rem 0.75rem', fontSize: '0.85rem' }}>Cancel</button>
+                        </form>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={rate.id}>
+                      <td>{rate.label}</td>
+                      <td>${rate.amount_per_hour.toFixed(2)}/hr</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button className="secondary" onClick={() => startEditRate(rate)} style={{ padding: '0.2rem 0.5rem', fontSize: '0.78rem' }}>Edit</button>
+                          <button
+                            className="danger"
+                            onClick={() => handleDeleteRate(rate.id)}
+                            disabled={deletingRateId === rate.id}
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.78rem' }}
+                          >
+                            {deletingRateId === rate.id ? '...' : 'Delete'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
                 ))}
               </tbody>
             </table>
